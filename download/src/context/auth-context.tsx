@@ -36,6 +36,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const mockSessionCheck = setTimeout(() => {
+      // Auto-login as admin for testing (remove this in production)
+      const testAdminUser: User = {
+        id: 'user-admin-001',
+        name: 'Admin User',
+        role: 'admin',
+        accessCode: 'ADMIN123',
+        accessPassword: 'adminpass'
+      };
+      setUser(testAdminUser);
       setIsLoading(false);
     }, 500);
     return () => clearTimeout(mockSessionCheck);
