@@ -11,9 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLanguage } from '@/hooks/use-language';
 import type { Language } from '@/context/language-context';
-import { useAuth, type User, type UserRole } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth';
+import type { User, UserRole } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
-import { mockSystemUsers, mockPatients, addOrUpdatePatient } from '@/lib/data';
 
 
 type LoginMethod = 'patient' | 'code' | 'register';
@@ -62,7 +62,7 @@ export default function LoginPage() {
   }, [language, loginMethod]);
 
 
-  const handlePatientPasswordLogin = (e: React.FormEvent) => {
+  const handlePatientPasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber || !patientPassword) {
       toast({
@@ -73,23 +73,16 @@ export default function LoginPage() {
       return;
     }
 
-    const existingPatient = mockPatients.find(p => p.phone === phoneNumber);
-
-    if (existingPatient && existingPatient.password === patientPassword) {
-      const loginUser: User = {
-        id: existingPatient.id,
-        name: existingPatient.name,
-        role: 'patient',
-      };
-      auth.login(loginUser);
+    try {
+      await auth.patientLogin(phoneNumber, patientPassword);
       toast({
         title: T.loginSuccessTitle,
         description: T.loginSuccessDescriptionPatient,
       });
-    } else {
+    } catch (error: any) {
       toast({
         title: T.invalidPhoneOrPasswordTitle || 'Login Failed',
-        description: T.invalidPhoneOrPasswordDescription || 'Invalid phone number or password.',
+        description: error.message || T.invalidPhoneOrPasswordDescription || 'Invalid phone number or password.',
         variant: 'destructive',
       });
     }
@@ -106,26 +99,16 @@ export default function LoginPage() {
       return;
     }
 
-    const user = mockSystemUsers.find(
-      (u) => u.accessCode?.toLowerCase() === accessCode.toLowerCase()
-    );
-
-    if (user && user.accessPassword === accessPassword) {
-      let description = T.loginSuccessDescriptionStaff;
-      if (user.role === 'doctor') description = T.loginSuccessDescriptionDoctor || 'Redirecting to Doctor Dashboard...';
-      else if (user.role === 'pharmacist') description = T.loginSuccessDescriptionPharmacist || 'Redirecting to Pharmacist Dashboard...';
-      else if (user.role === 'laboratory') description = T.loginSuccessDescriptionLaboratory || 'Redirecting to Laboratory Dashboard...';
-      else if (user.role === 'admin') description = T.loginSuccessDescriptionAdmin || 'Redirecting to Admin Dashboard...';
-
-      auth.login(user);
+    try {
+      await auth.staffLogin(accessCode, accessPassword);
       toast({
         title: T.loginSuccessTitle,
-        description: description,
+        description: T.loginSuccessDescriptionStaff,
       });
-    } else {
+    } catch (error: any) {
       toast({
         title: T.invalidCredentialsTitle || 'Invalid Credentials',
-        description: T.invalidCredentialsDescription || 'The Access Code or Password is incorrect.',
+        description: error.message || T.invalidCredentialsDescription || 'The Access Code or Password is incorrect.',
         variant: 'destructive',
       });
     }
@@ -150,35 +133,21 @@ export default function LoginPage() {
       return;
     }
 
-    const existingPatientByPhone = mockPatients.find(p => p.phone === regPhoneNumber);
-    if (existingPatientByPhone) {
-      toast({
-        title: T.phoneNumberExistsTitle,
-        description: T.phoneNumberExistsDescription,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
-      // Create new patient. addOrUpdatePatient will assign a new ID.
-      const newPatientRecord = await addOrUpdatePatient(regFullName, regPhoneNumber, undefined, regPassword);
-
-      const loginUser: User = {
-        id: newPatientRecord.id,
-        name: newPatientRecord.name,
-        role: 'patient',
-      };
-      auth.login(loginUser);
+      await auth.patientRegister({
+        name: regFullName,
+        phone: regPhoneNumber,
+        password: regPassword,
+      });
       toast({
         title: T.registrationSuccessTitle,
         description: T.registrationSuccessDescription,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
       toast({
         title: T.registrationErrorTitle || "Registration Failed",
-        description: T.registrationErrorDescription || "An unexpected error occurred. Please try again.",
+        description: error.message || T.registrationErrorDescription || "An unexpected error occurred. Please try again.",
         variant: 'destructive',
       });
     }
