@@ -4,6 +4,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import apiService from '@/lib/api';
 
 export type UserRole = 'patient' | 'doctor' | 'pharmacist' | 'laboratory' | 'admin' | null;
 
@@ -14,6 +15,12 @@ export interface User {
   accessCode?: string; // Used for staff/admin login, like a username
   accessPassword?: string; // Password for staff/admin login
   clinicId?: string; // ID of the clinic the staff user is associated with
+  token?: string; // API token for authentication
+  phone?: string; // Patient phone number
+  email?: string; // Staff email
+  specialization?: string; // Doctor specialization
+  license_number?: string; // Professional license number
+  clinic?: any; // Clinic information for staff
 }
 
 interface AuthContextType {
@@ -21,6 +28,9 @@ interface AuthContextType {
   login: (userData: User, redirectTo?: string) => void;
   logout: () => void;
   isLoading: boolean;
+  patientLogin: (phone: string, password: string) => Promise<void>;
+  staffLogin: (accessCode: string, password: string) => Promise<void>;
+  patientRegister: (userData: any) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,23 +45,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const mockSessionCheck = setTimeout(() => {
-      // Auto-login as admin for testing (remove this in production)
-      const testAdminUser: User = {
-        id: 'user-admin-001',
-        name: 'Admin User',
-        role: 'admin',
-        accessCode: 'ADMIN123',
-        accessPassword: 'adminpass'
-      };
-      setUser(testAdminUser);
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(mockSessionCheck);
+    // Check for stored token and fetch fresh user data from database
+    const checkAuth = async () => {
+      try {
+        const storedToken = localStorage.getItem('auth_token');
+        
+        if (storedToken) {
+          // Fetch fresh user data from backend
+          const userData = await apiService.getProfile(storedToken);
+          setUser({ ...userData, token: storedToken });
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const login = useCallback((userData: User, redirectTo?: string) => {
     setUser(userData);
+    
+    // Store only token in localStorage, user data will be fetched from database
+    if (userData.token) {
+      localStorage.setItem('auth_token', userData.token);
+    }
+    
     if (redirectTo) {
       router.push(redirectTo);
     } else {
@@ -65,20 +88,85 @@ export function AuthProvider({ children }: AuthProviderProps) {
         router.push('/dashboard/laboratory');
       } else if (userData.role === 'admin') {
         router.push('/dashboard/admin');
-      }
-       else {
+      } else {
         router.push('/');
       }
     }
   }, [router]);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    router.push('/login');
-  }, [router]);
+  const logout = useCallback(async () => {
+    try {
+      if (user?.token) {
+        await apiService.logout(user.token);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('auth_token');
+      router.push('/login');
+    }
+  }, [user, router]);
+
+  const patientLogin = useCallback(async (phone: string, password: string) => {
+    try {
+      const response = await apiService.patientLogin(phone, password);
+      const userData: User = {
+        id: response.user.id,
+        name: response.user.name,
+        role: response.user.role as UserRole,
+        phone: response.user.phone,
+        token: response.token,
+      };
+      login(userData);
+    } catch (error) {
+      throw error;
+    }
+  }, [login]);
+
+  const staffLogin = useCallback(async (accessCode: string, password: string) => {
+    try {
+      const response = await apiService.staffLogin(accessCode, password);
+      const userData: User = {
+        id: response.user.id,
+        name: response.user.name,
+        role: response.user.role as UserRole,
+        accessCode: response.user.access_code,
+        clinicId: response.user.clinic_id,
+        token: response.token,
+      };
+      login(userData);
+    } catch (error) {
+      throw error;
+    }
+  }, [login]);
+
+  const patientRegister = useCallback(async (userData: any) => {
+    try {
+      const response = await apiService.patientRegister(userData);
+      const user: User = {
+        id: response.user.id,
+        name: response.user.name,
+        role: response.user.role as UserRole,
+        phone: response.user.phone,
+        token: response.token,
+      };
+      login(user);
+    } catch (error) {
+      throw error;
+    }
+  }, [login]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isLoading, 
+      patientLogin, 
+      staffLogin, 
+      patientRegister 
+    }}>
       {children}
     </AuthContext.Provider>
   );

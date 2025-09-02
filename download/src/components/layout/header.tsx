@@ -81,7 +81,7 @@ export function Header() {
     auth.user ? (
       <Button variant="outline" onClick={auth.logout} className="ml-2">
         <LogOut className="mr-2 h-4 w-4" />
-        {T.logout} {auth.user.name ? `(${auth.user.name.split(' ')[0]})` : ''}
+        {T.logout} {`( ${auth.user.name } ) `}
       </Button>
     ) : showHeaderLoginButton ? ( 
       <Button variant="outline" asChild className="ml-2">
@@ -147,7 +147,7 @@ export function Header() {
             <Button key={item.href} variant="ghost" asChild>
               <Link href={item.href}>
                 {item.icon || null}
-                {T[item.labelKey]}
+                {String(T[item.labelKey])}
               </Link>
             </Button>
           ))}
@@ -170,7 +170,7 @@ export function Header() {
                   <Button key={item.href} variant="ghost" className="w-full justify-start text-lg" asChild>
                     <Link href={item.href}>
                       {item.icon || null}
-                      {T[item.labelKey]}
+                      {String(T[item.labelKey])}
                     </Link>
                   </Button>
                 ))}
