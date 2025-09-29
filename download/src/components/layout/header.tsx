@@ -114,7 +114,7 @@ export function Header() {
       value={language}
       onValueChange={(value) => setLanguage(value as Language)}
     >
-      <SelectTrigger className="w-auto px-3 py-1.5 text-xs md:text-sm border-none shadow-none bg-transparent hover:bg-muted/50">
+      <SelectTrigger className="w-auto px-3 py-1.5 text-xs md:text-sm border-none shadow-none bg-transparent hover:bg-muted/50 ml-2">
         <Globe className="mr-1.5 h-4 w-4" />
         <SelectValue />
       </SelectTrigger>
